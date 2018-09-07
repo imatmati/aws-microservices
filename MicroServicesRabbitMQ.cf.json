@@ -1,0 +1,101 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Resources": {
+        "AutoScalingMicroServicesHTTP": {
+            "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "Properties": {
+                "AutoScalingGroupName": "ASGHTTP",
+                "AvailabilityZones": { "Fn::GetAZs" : { "Ref" : "AWS::Region" } },
+                "DesiredCapacity": "1",
+                "MinSize": "1",
+                "MaxSize": "1",
+                "LaunchConfigurationName": {
+                    "Ref": "LaunchConfigurationMicroServicesHTTP"
+                },
+                "TargetGroupARNs": [
+                    {
+                        "Ref": "TargetGroupHTTP"
+                    }
+                ],
+                "LoadBalancerNames": [
+                    {
+                        "Ref": "ELBHTTP"
+                    }
+                ]
+            }            
+        },
+        "LaunchConfigurationMicroServicesHTTP": {
+            "Type": "AWS::AutoScaling::LaunchConfiguration",
+            "Properties": {
+                "InstanceType": "t2.micro",
+                "ImageId": "ami-2cf54551",
+                "KeyName": "ami1",
+                "AssociatePublicIpAddress": false,
+                "SecurityGroups": [{"Fn::GetAtt": ["InstancesHTTPSecurityGroup","GroupId"]}]
+            }
+        },
+        "TargetGroupHTTP": {
+            "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+            "Properties": {
+                "Port": "8080",
+                "Name": "TargetGroupHTTP",
+                "Protocol": "HTTP",
+                "TargetType": "instance",
+                "UnhealthyThresholdCount": 2,
+                "HealthyThresholdCount": 2,
+                "HealthCheckPath": "/",
+                "VpcId": "vpc-e56a0a8c"
+            }
+        },
+        "ELBSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "from external to network",
+                "SecurityGroupIngress": {
+                    "FromPort": 80,
+                    "CidrIp": "<monip>/8",
+                    "IpProtocol": "tcp",
+                    "ToPort": 8080
+                },
+                "GroupName": "ELBSecurityGroup"
+            }
+        },
+        "InstancesHTTPSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "From ELB to instances",
+                "GroupName": "InstancesHTTPSecurityGroup",
+                "SecurityGroupIngress": {
+                    "FromPort": 8080,
+                    "SourceSecurityGroupId":{"Fn::GetAtt": ["ELBSecurityGroup","GroupId"]},
+                    "IpProtocol": "tcp",
+                    "ToPort": 8080
+                }
+            }
+        },
+        "ELBHTTP": {
+            "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
+            "Properties": {
+                "AvailabilityZones": {
+                    "Fn::GetAZs": ""
+                },
+                "Listeners": [
+                    {
+                        "InstancePort": 8080,
+                        "InstanceProtocol": "HTTP",
+                        "LoadBalancerPort": 80,
+                        "Protocol": "HTTP"
+                    }
+                ],
+                "SecurityGroups": [{"Fn::GetAtt": ["ELBSecurityGroup","GroupId"]}],
+                "HealthCheck": {
+                    "Interval": 30,
+                    "Target": "TCP:8080",
+                    "HealthyThreshold": 2,
+                    "UnhealthyThreshold": 2,
+                    "Timeout": 10
+                }
+            }
+        }
+    }
+}
